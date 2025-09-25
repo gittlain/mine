@@ -44,27 +44,30 @@ function createBoard(size) {
 
 
 function renderBoard(mat, selector) {
-
-    var strHTML = '<table><tbody>'
+    var strHTML = '<table>'
+    strHTML += `
+      <thead>
+        <tr>
+          <th colspan="${mat[0].length}">
+            <img class="emogi" src="img/happy.png" style="height:40px;">
+          </th>
+        </tr>
+      </thead>`
+    strHTML += '<tbody>'
     for (var i = 0; i < mat.length; i++) {
-
         strHTML += '\n<tr>'
         for (var j = 0; j < mat[0].length; j++) {
-
-            const cell = mat[i][j]
             const className = `cell cell-${i}-${j}`
-            const cellContent = cell.isMine ? '💣' : ''
-
-            strHTML += `\n<td class="${className}">${cellContent}</td>`
+            strHTML += `<td class="${className}" onclick="onCellClicked(this, ${i}, ${j})"></td>`
         }
         strHTML += '\n</tr>'
     }
     strHTML += '\n</tbody></table>'
 
-    console.log(strHTML)
     const elContainer = document.querySelector(selector)
     elContainer.innerHTML = strHTML
 }
+
 
 function placeMines(board, minesCount) {
     var size = board.length
@@ -82,17 +85,58 @@ function placeMines(board, minesCount) {
 }
 
 
+function setMinesNegsCount(board) {
+
+    // Count mines around each cell
+    // and set the cell's
+    // minesAroundCount.
+
+    const size = board.length
+
+    for (var i = 0; i < size; i++) {
+        for (var j = 0; j < size; j++) {
+            if (board[i][j].isMine) continue
+            var count = 0
+            // 8
+            for (var x = i - 1; x <= i + 1; x++) {
+                if (x < 0 || x >= size) continue
+                for (var y = j - 1; y <= j + 1; y++) {
+                    if (y < 0 || y >= size) continue
+                    if (x === i && y === j) continue
+                    if (board[x][y].isMine) count++
+                }
+            }
+            board[i][j].minesAroundCount = count
+        }
+    }
+}
 
 function setLevelAndRestart(size, mines) {
     gLevel.SIZE = size
     gLevel.MINES = mines
     gBoard = createBoard(size)
     placeMines(gBoard, mines)
-    console.table(gBoard)
+    setMinesNegsCount(gBoard)  
     renderBoard(gBoard, '.main-board')
 }
 
+function onCellClicked(elCell, i, j) {
+    const cell = gBoard[i][j]
+    if (cell.isRevealed) return
 
+    cell.isRevealed = true
+    if (cell.isMine) {
+        elCell.textContent = '💣'
+        elCell.style.backgroundColor = 'lightcoral'
+
+    } else if (cell.minesAroundCount > 0) {
+        elCell.textContent = cell.minesAroundCount
+        elCell.style.backgroundColor = 'lightgray'
+    } else {
+        elCell.style.backgroundColor = 'lightgray'
+
+    }
+}
 
 
 
@@ -100,18 +144,6 @@ function setLevelAndRestart(size, mines) {
 
 function onRestart() {
 
-}
-
-function setMinesNegsCount(board) {
-
-// Count mines around each cell
-// and set the cell's
-// minesAroundCount.
-
-}
-
-function onCellClicked(elCell, i, j){
-    // Called when a cell is clicked
 }
 
 function onCellMarked(elCell, i, j){
@@ -140,4 +172,24 @@ function expandReveal(board, elCell,i, j){
 // BONUS: Do it like the real
 // algorithm (see description at desc bellow
 
+}
+
+
+function unitTest(label, input, expected, actual) {
+    var styleStr = (expected === actual) ? 'color: lightgreen;' : 'color: red'
+
+    console.groupCollapsed(`%c${label}`, styleStr)
+
+    console.log(`input: ${input}`)
+    console.log(`expected: ${expected}`, typeof expected)
+    console.log(`actual: ${actual}`, typeof actual)
+    
+    console.groupEnd()
+}
+
+
+function getRandomInt(min, max) {
+  const minCeiled = Math.ceil(min);
+  const maxFloored = Math.floor(max);
+  return Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled); // The maximum is inclusive
 }
