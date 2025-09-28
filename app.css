@@ -28,17 +28,16 @@ button {
     display: none;
 }
 
-.levels{
+.levels {
     height: 30px;
 }
 
 footer {
-  color: rgb(216, 0, 0);
-  padding: 10px;
-  margin-top: 50px;
-  text-align: center;
+    color: rgb(216, 0, 0);
+    padding: 10px;
+    margin-top: 50px;
+    text-align: center;
 }
-
 
 .emogi {
     cursor: pointer;
@@ -47,3 +46,4 @@ footer {
 .cell {
     cursor: pointer;
 }
+

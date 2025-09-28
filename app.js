@@ -1,24 +1,14 @@
 'use strict'
 
-// Support 3 levels of the game
-// o Beginner (4 * 4 with 2 MINES)
-// o Medium (8 * 8 with 14 MINES)
-// o Expert (12 * 12 with 32 MINES)
 
+var gFirstClick = true
 var gBoard
 
-var cellContent = {
-    minesAroundCount: 0,
-    isRevealed: false,
-    isMine: false,
-    isMarked: false
-}
-
 var gGame = {
-    inOn: false, //true when the game is on
-    revealedCount: 0, //how many cells are revealed
-    markedCount: 0, //flags on
-    secsPassed: 0, //time passed
+    isOn: false,
+    revealedCount: 0,
+    markedCount: 0,
+    secsPassed: 0,
 }
 
 var gLevel = {
@@ -35,30 +25,31 @@ function createBoard(size) {
                 minesAroundCount: 0,
                 isRevealed: false,
                 isMine: false,
-                isMarked: false
+                isMarked: false,
             }
         }
     }
     return board
 }
 
-
 function renderBoard(mat, selector) {
     var strHTML = '<table>'
     strHTML += `
-      <thead>
-        <tr>
-          <th colspan="${mat[0].length}">
-            <img class="emogi" src="img/happy.png" style="height:40px;">
-          </th>
-        </tr>
-      </thead>`
+    <thead>
+      <tr>
+        <th colspan="${mat[0].length}">
+          <img class="emogi" src="img/happy.png" style="height:40px;" onclick="onRestart(this)">
+        </th>
+      </tr>
+    </thead>`
     strHTML += '<tbody>'
     for (var i = 0; i < mat.length; i++) {
         strHTML += '\n<tr>'
         for (var j = 0; j < mat[0].length; j++) {
             const className = `cell cell-${i}-${j}`
-            strHTML += `<td class="${className}" onclick="onCellClicked(this, ${i}, ${j})"></td>`
+            strHTML += `<td class="${className}" 
+                     onclick="onCellClicked(this, ${i}, ${j})"
+                     oncontextmenu="onCellMarked(event,this,${i},${j})"></td>`
         }
         strHTML += '\n</tr>'
     }
@@ -68,36 +59,25 @@ function renderBoard(mat, selector) {
     elContainer.innerHTML = strHTML
 }
 
-
-function placeMines(board, minesCount) {
+function placeMines(board, minesCount, firstI, firstJ) {
     var size = board.length
     var minesPlaced = 0
-
     while (minesPlaced < minesCount) {
         var i = Math.floor(Math.random() * size)
         var j = Math.floor(Math.random() * size)
 
-        if (!board[i][j].isMine) {
-            board[i][j].isMine = true
-            minesPlaced++
-        }
+        if ((i === firstI && j === firstJ) || board[i][j].isMine) continue
+        board[i][j].isMine = true
+        minesPlaced++
     }
 }
 
-
 function setMinesNegsCount(board) {
-
-    // Count mines around each cell
-    // and set the cell's
-    // minesAroundCount.
-
-    const size = board.length
-
+    var size = board.length
     for (var i = 0; i < size; i++) {
         for (var j = 0; j < size; j++) {
             if (board[i][j].isMine) continue
             var count = 0
-            // 8
             for (var x = i - 1; x <= i + 1; x++) {
                 if (x < 0 || x >= size) continue
                 for (var y = j - 1; y <= j + 1; y++) {
@@ -115,81 +95,120 @@ function setLevelAndRestart(size, mines) {
     gLevel.SIZE = size
     gLevel.MINES = mines
     gBoard = createBoard(size)
-    placeMines(gBoard, mines)
-    setMinesNegsCount(gBoard)  
+    gGame.isOn = true
+    gGame.revealedCount = 0
+    gGame.markedCount = 0
+    gFirstClick = true
     renderBoard(gBoard, '.main-board')
 }
 
 function onCellClicked(elCell, i, j) {
+
+    if (!gGame.isOn) return
     const cell = gBoard[i][j]
-    if (cell.isRevealed) return
+    if (cell.isRevealed || cell.isMarked) return
+
+    if (gFirstClick) {
+        placeMines(gBoard, gLevel.MINES, i, j)
+        setMinesNegsCount(gBoard)
+        gFirstClick = false
+    }
 
     cell.isRevealed = true
+    gGame.revealedCount++
+
     if (cell.isMine) {
         elCell.textContent = '💣'
         elCell.style.backgroundColor = 'lightcoral'
+        revealAllMines()
 
-    } else if (cell.minesAroundCount > 0) {
+        var elEmogi = document.querySelector('.emogi')
+        elEmogi.src = "img/sad.png"
+
+        gGame.isOn = false
+        return
+    }
+
+    if (cell.minesAroundCount > 0) {
         elCell.textContent = cell.minesAroundCount
         elCell.style.backgroundColor = 'lightgray'
     } else {
         elCell.style.backgroundColor = 'lightgray'
+        expandReveal(i, j)
+    }
 
+    checkGameOver()
+}
+
+function onCellMarked(ev, elCell, i, j) {
+    ev.preventDefault()
+    if (!gGame.isOn) return
+    var cell = gBoard[i][j]
+    if (cell.isRevealed) return
+
+    cell.isMarked = !cell.isMarked
+    elCell.textContent = cell.isMarked ? '🚩' : ''
+    gGame.markedCount += cell.isMarked ? 1 : -1
+
+    checkGameOver()
+}
+
+function expandReveal(i, j) {
+    for (var x = i - 1; x <= i + 1; x++) {
+        for (var y = j - 1; y <= j + 1; y++) {
+            if (x < 0 || y < 0 || x >= gLevel.SIZE || y >= gLevel.SIZE) continue
+            var neighbor = gBoard[x][y]
+            if (!neighbor.isRevealed && !neighbor.isMine) {
+                neighbor.isRevealed = true
+                gGame.revealedCount++
+                var elNeighbor = document.querySelector(`.cell-${x}-${y}`)
+                elNeighbor.style.backgroundColor = 'lightgray'
+                if (neighbor.minesAroundCount > 0) {
+                    elNeighbor.textContent = neighbor.minesAroundCount
+                } else {
+                    expandReveal(x, y)
+                }
+            }
+        }
     }
 }
 
+function revealAllMines() {
+    for (var i = 0; i < gLevel.SIZE; i++) {
+        for (var j = 0; j < gLevel.SIZE; j++) {
+            if (gBoard[i][j].isMine) {
+                var elCell = document.querySelector(`.cell-${i}-${j}`)
+                elCell.textContent = '💣'
+                elCell.style.backgroundColor = 'lightcoral'
+            }
+        }
+    }
+}
 
-
-//yet to//
+function checkGameOver() {
+    var totalCells = gLevel.SIZE * gLevel.SIZE
+    if (gGame.revealedCount === totalCells - gLevel.MINES) {
+        document.querySelector('.emogi').src = "img/cool.png"
+        gGame.isOn = false
+        revealAllMines()
+    }
+}
 
 function onRestart() {
-
-}
-
-function onCellMarked(elCell, i, j){
-// Called when a cell is right-
-// clicked
-// See how you can hide the context
-// menu on right click
-}
-
-function checkGameOver(){
-//     The game ends when all mines
-// are marked, and all the other
-// cells are revealed
-
-}
-
-function expandReveal(board, elCell,i, j){
-// When the user clicks a cell with
-// no mines around, reveal not
-// only that cell, but also its
-// neighbors.
-// NOTE: start with a basic
-// implementation that only
-// reveals the non-mine 1st degree
-// neighbors
-// BONUS: Do it like the real
-// algorithm (see description at desc bellow
-
+    setLevelAndRestart(gLevel.SIZE, gLevel.MINES)
+    document.querySelector('.emogi').src = "img/happy.png"
 }
 
 
-function unitTest(label, input, expected, actual) {
-    var styleStr = (expected === actual) ? 'color: lightgreen;' : 'color: red'
 
-    console.groupCollapsed(`%c${label}`, styleStr)
 
-    console.log(`input: ${input}`)
-    console.log(`expected: ${expected}`, typeof expected)
-    console.log(`actual: ${actual}`, typeof actual)
-    
-    console.groupEnd()
-}
 
+//
 
 function getRandomInt(min, max) {
   const minCeiled = Math.ceil(min);
   const maxFloored = Math.floor(max);
-  return Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled); // The maximum is inclusive
+  return Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled); 
 }
+
+
